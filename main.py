@@ -1,5 +1,6 @@
 import pygame
 import random
+import time
 
 pygame.init()
 pygame.font.init()
@@ -9,28 +10,32 @@ canvas = pygame.display.set_mode((1000, 500))
 pygame.display.set_caption("Jumpball")
 score = 0
 hscore = -1
-hscoreAck = False # True when user beats the high score
+hscoreAck = False  # True when user beats the high score
+startTime = time.time()
+displayTime = time.time()
 
 # Colors
 WHITE = (255, 255, 255)
-GREEN = (0, 100, 0)
+GREEN = (0, 150, 0)
 YELLOW = (255, 255, 0)
 
 # Game Over text
 font = pygame.font.SysFont('Comic Sans MS', 30)
-gameOver = font.render('You hit a pipe! Press Space to restart.', False, (0,0,0))
+gameOver = font.render('You hit a pipe! Press Space to restart.', False, (0, 0, 0))
 scoreFont = pygame.font.SysFont('Comic Sans MS', 15)
 scoreText = None
 
 # Sounds
-jumpSound = pygame.mixer.Sound("jumpSfx.wav")
-deathSound = pygame.mixer.Sound("deathSfx.wav")
-#hsSound = pygame.mixer.Sound("highScoreSfx.wav")
-scoreSound = pygame.mixer.Sound("scoreSfx.wav")
-pygame.mixer.music.load("musicLoop.wav")
-pygame.mixer.music.play(30,0)
+jumpSound = pygame.mixer.Sound("sounds/jumpSfx.wav")
+deathSound = pygame.mixer.Sound("sounds/deathSfx.wav")
+scoreSound = pygame.mixer.Sound("sounds/scoreSfx.wav")
+bumpSound = pygame.mixer.Sound("sounds/bumpsfx.wav")
+pygame.mixer.music.load("sounds/musicLoop.wav")
+pygame.mixer.music.play(30, 0)
+
 
 # Bird class
+
 class Bird:
     def __init__(self):
         self.x = 200  # Initial horizontal position
@@ -46,9 +51,14 @@ class Bird:
             self.grace_period -= 1  # Count down grace period
         self.velocity += self.gravity
         self.y += self.velocity
-        if self.y > 500:  # Prevent bird from going off the bottom
+        if self.y > 500:  # Bounce bird off the bottom
             self.y = 500
-            self.velocity = 0
+            self.velocity = random.choice([-0.1, -0.2, -0.3])
+            bumpSound.play()
+        if self.y < 0:  # Bounce bird off the top
+            self.y = 0
+            self.velocity = 0.3
+            bumpSound.play()
 
     def jump(self):
         self.velocity = self.jump_strength
@@ -70,8 +80,10 @@ class Bird:
                     return True
         return False
 
+
 # Pipe class
 class Pipe:
+
     def __init__(self, x, width, gap_height, canvas_height):
         self.x = x
         self.width = width
@@ -80,7 +92,7 @@ class Pipe:
         self.top_height = random.randint(50, self.canvas_height - self.gap_height - 50)
         self.bottom_height = self.canvas_height - self.top_height - self.gap_height
         assert self.bottom_height > 0, "Pipe bottom height must be positive."
-        self.speed = 0.2 * ((0.05*score) + 1)
+        self.speed = 0.2 * ((0.05 * score) + 1)
         self.scored = False
         print(f"Pipe initialized: x={self.x}, top_height={self.top_height}, bottom_height={self.bottom_height}")
 
@@ -98,7 +110,7 @@ class Pipe:
 # Reset game function
 def reset_game():
     pygame.mixer.music.play(30)
-    global bird, pipes, dead, score, hscore, hscoreAck
+    global bird, pipes, dead, score, hscore, hscoreAck, startTime
     bird = Bird()  # Grace period is reset in the constructor
     pipes = [Pipe(1500, 80, 150, 500)]  # Position first pipe further away
     if score > hscore:
@@ -106,6 +118,7 @@ def reset_game():
     score = 0
     hscoreAck = False
     dead = False
+    startTime = time.time()
 
 
 # Game loop
@@ -115,8 +128,6 @@ bird = Bird()
 pipes = [Pipe(1500, 80, 150, 500)]
 
 while not exit:
-    # pygame.display.set_caption(str(dead))  # Debug line, don't remove
-
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             exit = True
@@ -132,11 +143,15 @@ while not exit:
     # Clear the screen
     canvas.fill(WHITE)
 
-    scoreText = scoreFont.render(f"Score: {str(score)}", False, (0,0,0))
-    canvas.blit(scoreText, (20,10))
+    scoreText = scoreFont.render(f"Score: {str(score)}", False, (0, 0, 0))
+    canvas.blit(scoreText, (20, 10))
+    (hours, _) = divmod(displayTime, 3600)
+    (minutes, seconds) = divmod(displayTime, 60)
+    timeText = scoreFont.render(f"{hours:02.0f}:{minutes:02.0f}:{seconds:05.2f}", False, (0, 0, 0))
+    canvas.blit(timeText, (20, 30))
     if score <= hscore:
         highScoreText = scoreFont.render(f"High Score: {str(hscore)}", False, (0, 0, 0))
-        canvas.blit(highScoreText, (20, 30))
+        canvas.blit(highScoreText, (20, 50))
 
     if not dead:
         # Update and draw bird
@@ -170,12 +185,15 @@ while not exit:
         if score > hscore and not hscoreAck:
             hscoreAck = True
             pygame.mixer.music.stop()
-            pygame.mixer.music.load("highScoreSfx.wav")
+            pygame.mixer.music.load("sounds/highScoreSfx.wav")
             pygame.mixer.music.play(0, 0, 0)
-            pygame.mixer.music.queue("musicLoop.wav", "wav", 30)
+            pygame.mixer.music.queue("sounds/musicLoop.wav", "wav", 30)
+
+        # Update current time (elapsed stopwatch alive)
+        displayTime = time.time() - startTime
 
     else:
-        canvas.blit(gameOver, (250,200))
+        canvas.blit(gameOver, (250, 200))
 
     pygame.display.update()
 
